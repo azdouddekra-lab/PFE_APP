@@ -183,17 +183,26 @@ def gradcam(model, arr, class_idx):
     try:
         import tensorflow as tf
         import cv2
-        # En Keras 3, un modèle Sequential chargé n'a pas .input/.output tant
-        # qu'il n'a pas été appelé une première fois sur des données.
-        if not getattr(model, "_inbound_nodes", None):
-            model(arr, training=False)
-        gm = tf.keras.models.Model(
-            inputs=model.input,
-            outputs=[model.get_layer('Conv_1').output, model.output]
-        )
+        # Le modèle est un Sequential contenant MobileNetV2 comme sous-modèle
+        # (ou ses couches conv directement). On découpe juste après la dernière
+        # couche convolutive pour récupérer la feature map à visualiser.
+        layers = model.layers
+        split_idx = None
+        for i, layer in enumerate(layers):
+            if isinstance(layer, tf.keras.Model) or 'conv' in layer.name.lower():
+                split_idx = i
+        if split_idx is None:
+            raise ValueError("Couche convolutive introuvable pour Grad-CAM.")
+
         with tf.GradientTape() as tape:
-            conv_out, preds = gm(arr, training=False)
-            loss = preds[:, class_idx]
+            x = arr
+            for layer in layers[:split_idx + 1]:
+                x = layer(x, training=False)
+            conv_out = x
+            tape.watch(conv_out)
+            for layer in layers[split_idx + 1:]:
+                x = layer(x, training=False)
+            loss = x[:, class_idx]
         grads = tape.gradient(loss, conv_out)
         pw = tf.reduce_mean(grads, axis=(0,1,2))
         heatmap = (conv_out[0] @ pw[..., tf.newaxis]).numpy().squeeze()
