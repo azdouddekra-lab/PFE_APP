@@ -7,3 +7,4 @@ opencv-python-headless
 scikit-learn
 matplotlib
 pandas
+reportlab
