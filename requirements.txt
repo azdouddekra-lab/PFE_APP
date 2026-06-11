@@ -1,0 +1,9 @@
+streamlit
+tensorflow==2.16.1
+numpy
+pillow
+gdown
+opencv-python-headless
+scikit-learn
+matplotlib
+pandas
