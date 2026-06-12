@@ -208,6 +208,8 @@ def gradcam(model, arr, class_idx):
         heatmap = (conv_out[0] @ pw[..., tf.newaxis]).numpy().squeeze()
         heatmap = np.maximum(heatmap, 0)
         if heatmap.max() > 0: heatmap /= heatmap.max()
+        # Seuillage — ne garder que les zones les plus activées
+        heatmap[heatmap < 0.5] = 0
         h = cv2.resize(heatmap, (224,224))
         h = np.uint8(255 * h)
         colored = cv2.applyColorMap(h, cv2.COLORMAP_JET)
@@ -309,14 +311,23 @@ with col_r:
                 # Grad-CAM
                 st.markdown("---")
                 st.markdown("** Grad-CAM — Zone activée :**")
-                overlay = gradcam(model, arr, pred_idx)
-                if overlay:
-                    gc1, gc2 = st.columns(2)
-                    with gc1: st.image(img.resize((224,224)), caption="IRM originale", use_container_width=True)
-                    with gc2: st.image(overlay, caption="🌡️ Grad-CAM", use_container_width=True)
-                    st.markdown('<div class="gcam-label">🔴 Rouge = zone activée &nbsp;|&nbsp; 🔵 Bleu = zone peu activée</div>', unsafe_allow_html=True)
+                if pred_class == 'no_tumor':
+                    st.info("Grad-CAM non applicable : aucune tumeur détectée sur cette IRM.")
                 else:
-                    st.info("Grad-CAM non disponible.")
+                    overlay = gradcam(model, arr, pred_idx)
+                    if overlay:
+                        gc1, gc2 = st.columns(2)
+                        with gc1: st.image(img.resize((224,224)), caption="IRM originale", use_container_width=True)
+                        with gc2: st.image(overlay, caption="🌡️ Grad-CAM", use_container_width=True)
+                        st.markdown('<div class="gcam-label">🔴 Rouge = zone activée &nbsp;|&nbsp; 🔵 Bleu = zone peu activée</div>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<div class="gcam-label" style="margin-top:0.4rem">'
+                            '⚠️ Les visualisations Grad-CAM ne correspondent pas toujours exactement à la '
+                            'localisation réelle de la tumeur. Elles indiquent les régions de l\'image ayant '
+                            'le plus contribué à la décision du modèle, et non une segmentation précise.'
+                            '</div>', unsafe_allow_html=True)
+                    else:
+                        st.info("Grad-CAM non disponible.")
 
                 # Rapport médical
                 st.markdown("---")
